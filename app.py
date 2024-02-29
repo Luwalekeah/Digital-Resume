@@ -26,7 +26,7 @@ SOCIAL_MEDIA = {
 PROJECTS = {
     "🏆 Places Search - Working with the Google Maps Places API ": "https://luwah-places-search.onrender.com",
     "🏆 Citation Machine - A robust way to cite sources w/ out ads": "https://luwahs-citation-machine.onrender.com",
-    "🏆 GSheets Database - This will be live soon": "https://github.com/Luwalekeah/Google-Sheets-Database",
+    "🏆 GSheets Database - Query an Excel file like a database table": "https://luwah-gs-db.streamlit.app/",
     "🏆 Recent Certificaiton - Microsoft Certified: Azure Fundamentals (AZ-900) ": "https://learn.microsoft.com/en-us/users/dcooke/transcript/vplg0t2qnzxxqrj",
 }
 
