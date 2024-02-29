@@ -93,7 +93,7 @@ st.write(
 
 # --- SKILLS ---
 st.write('\n')
-st.subheader("Hard Skills")
+st.subheader("Technical Skills")
 st.write(
     """
 - 👩‍💻 Programming: Python (Pandas, Numpy), SQL, SAS
