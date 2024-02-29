@@ -108,7 +108,7 @@ st.write(
 st.write('\n')
 st.write("---")
 st.subheader("Projects & Accomplishments")
-st.markdown("<p style='color:lavender; font-style:italic;'>First two links may take up to 2 mins to load. If unsuccessful, please refresh the window.</p>", unsafe_allow_html=True)
+st.markdown("<p style='color:red; font-style:italic;'>First three links may take up to 2 mins to load. If unsuccessful, please refresh the window.</p>", unsafe_allow_html=True)
 for project, link in PROJECTS.items():
     st.write(f"[{project}]({link})")
 
