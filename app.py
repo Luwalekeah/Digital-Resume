@@ -1,5 +1,4 @@
 from pathlib import Path
-
 import streamlit as st
 from PIL import Image
 
@@ -25,10 +24,10 @@ SOCIAL_MEDIA = {
     "Credly": "https://www.credly.com/users/daniel-cooke.94fe75dd/badges",
 }
 PROJECTS = {
-    # "🏆 Sales Dashboard - Comparing sales across three stores": "https://youtu.be/Sb0A9i6d320",
-    # "🏆 Income and Expense Tracker - Web app with NoSQL database": "https://youtu.be/3egaMfE9388",
-    # "🏆 Desktop Application - Excel2CSV converter with user settings & menubar": "https://youtu.be/LzCfNanQ_9c",
-    # "🏆 MyToolBelt - Custom MS Excel add-in to combine Python & Excel": "https://pythonandvba.com/mytoolbelt/",
+    "🏆 Places Search - Working with the Google Maps Places API ": "https://luwah-places-search.onrender.com",
+    "🏆 Citation Machine - A robust way to cite sources w/ out ads": "https://luwahs-citation-machine.onrender.com",
+    "🏆 GSheets Database - This will be live soon": "https://github.com/Luwalekeah/Google-Sheets-Database",
+    "🏆 Recent Certificaiton - Microsoft Certified: Azure Fundamentals (AZ-900) ": "https://learn.microsoft.com/en-us/users/dcooke/transcript/vplg0t2qnzxxqrj",
 }
 
 
@@ -105,10 +104,18 @@ st.write(
 )
 
 
+# --- Projects & Accomplishments ---
+st.write('\n')
+st.write("---")
+st.subheader("Projects & Accomplishments")
+st.markdown("<p style='color:lavender; font-style:italic;'>First two links may take up to 2 mins to load. If unsuccessful, please refresh the window.</p>", unsafe_allow_html=True)
+for project, link in PROJECTS.items():
+    st.write(f"[{project}]({link})")
+
 # --- WORK HISTORY ---
 st.write('\n')
-st.subheader("Work History")
 st.write("---")
+st.subheader("Work History")
 
 # --- JOB 1
 st.write("🚧", "**Senior Data Engineer | United Healthcare (M&R Stars)**")
@@ -175,9 +182,3 @@ st.write(
 """
 )
 
-# # --- Projects & Accomplishments ---
-# st.write('\n')
-# st.subheader("Projects & Accomplishments")
-# st.write("---")
-# for project, link in PROJECTS.items():
-#     st.write(f"[{project}]({link})")
