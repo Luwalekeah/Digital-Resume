@@ -5,9 +5,9 @@ from PIL import Image
 
 # --- PATH SETTINGS ---
 current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
-css_file = current_dir / "luwah-resume" / "public" / "static" / "styles" / "main.css"
-resume_file = current_dir  / "luwah-resume" / "public" / "static" / "assets" / "Daniel_Cooke_CV.pdf"
-profile_pic = current_dir  / "luwah-resume" / "public" / "static" / "assets" / "profile-pic.png"
+css_file = current_dir / "static" / "styles" / "main.css"
+resume_file = current_dir  / "static" / "assets" / "Daniel_Cooke_CV.pdf"
+profile_pic = current_dir  / "static" / "assets" / "profile-pic.png"
 
 
 # --- GENERAL SETTINGS ---
