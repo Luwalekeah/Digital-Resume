@@ -9,7 +9,7 @@ certs_dir = current_dir / "static" / "assets" / "certs"
 # --- PAGE CONFIG ---
 st.set_page_config(
     page_title="Certifications | Daniel Cooke",
-    page_icon="📜",
+    page_icon="👋🏾",
     layout="wide"
 )
 
@@ -54,32 +54,32 @@ st.markdown("### 📚 Currently Pursuing")
 in_progress = [
     {
         "name": "Azure DevOps Engineer Expert (AZ-400)",
-        "target": "2026",
+        "target": "Q1 2026",
         "progress": 0
     },
     {
         "name": "Docker Certified Associate",
-        "target": "2026",
+        "target": "Q1 2026",
         "progress": 0
     },
     {
         "name": "Ansible Automation Certification",
-        "target": "2026",
+        "target": "Q1 2026",
         "progress": 0
     },
     {
         "name": "Kubernetes Administrator (CKA)",
-        "target": "2026",
+        "target": "Q2 2026",
         "progress": 0
     },
     {
         "name": "HashiCorp Terraform Associate",
-        "target": "2026",
+        "target": "Q2 2026",
         "progress": 0
     },
     {
         "name": "Proxmox VE Administrator",
-        "target": "2026",
+        "target": "Q2 2026",
         "progress": 0
     },
 ]
@@ -322,7 +322,6 @@ for cat_name, cat_icon in category_order:
 
 
 # --- FOOTER ---
-st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: #586e75;'>

@@ -8,7 +8,7 @@ css_file = current_dir / "static" / "styles" / "main.css"
 # --- PAGE CONFIG ---
 st.set_page_config(
     page_title="Projects | Daniel Cooke",
-    page_icon="🚀",
+    page_icon="👋🏾",
     layout="wide"
 )
 
@@ -82,7 +82,7 @@ for project in featured_projects:
 st.markdown("---")
 
 # --- PROJECT CATEGORIES ---
-tab1, tab2, tab3, tab4 = st.tabs(["💼 Professional Work", "🔧 Automation", "🏠 Personal/Homelab", "🏢 Luwah Technologies"])
+tab1, tab2, tab3 = st.tabs(["💼 Professional Work", "🔧 Automation", "🏠 Personal/Homelab"])
 
 # --- PROFESSIONAL PROJECTS ---
 with tab1:
@@ -243,27 +243,27 @@ with tab3:
         {
             "title": "Energy-Saving Smart Home",
             "description": "Lights and appliances automatically adjust when leaving or going to bed. Voice control everything. Calendar events announce on speakers before they start—reducing energy bills while adding convenience.",
-            "status": "Active"
+            "status": "Completed"
         },
         {
             "title": "Personal Cloud Storage",
             "description": "Self-hosted file sync and backup solution replacing Google Drive/iCloud. Full control over data with access from any device.",
-            "status": "Active"
+            "status": "Completed"
         },
         {
             "title": "Linkstack Deployment",
             "description": "Personal link management solution for consolidating social and professional links in one place.",
-            "status": "Active"
+            "status": "Completed"
         },
         {
             "title": "Sunset Notification System",
             "description": "Automated system that sends notifications based on sunset times—useful for outdoor activities and soccer refereeing.",
-            "status": "Active"
+            "status": "Completed"
         },
         {
             "title": "Internal Documentation Wiki",
             "description": "BookStack-powered knowledge base for documenting processes, configurations, and project notes.",
-            "status": "Active"
+            "status": "Completed"
         },
         {
             "title": "Call of Duty Patch Notes Extractor",
@@ -281,117 +281,6 @@ with tab3:
             status_color = "#2ecc71" if project['status'] == "Active" else "#586e75"
             st.markdown(f"<span style='background-color: {status_color}; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;'>{project['status']}</span>", unsafe_allow_html=True)
         st.markdown("---")
-
-
-# --- LUWAH TECHNOLOGIES ---
-with tab4:
-    st.markdown("### Luwah Technologies LLC")
-    st.markdown("*Where Simplicity Meets Innovation*")
-    
-    st.markdown("""
-    Founded in 2025, Luwah Technologies helps small businesses and individuals harness technology 
-    without the complexity. Based in Aurora, Colorado.
-    """)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        **⚙️ Automation**
-        
-        Eliminate repetitive tasks with automated workflows that run in the background.
-        
-        *Recent work:* Email sorting systems, smart home integrations, notification workflows, subscription management
-        """)
-    
-    with col2:
-        st.markdown("""
-        **🔧 Technology Advisory**
-        
-        Unbiased guidance for confident technology decisions. Strategic advice on hardware, software, and infrastructure.
-        
-        *Recent work:* Business technology setup, hardware consultation, platform selection, cost optimization
-        """)
-    
-    with col3:
-        st.markdown("""
-        **📚 Education**
-        
-        Personalized training to build technology confidence and skills.
-        
-        *Recent work:* Tech career coaching, digital literacy training, blog articles, YouTube tutorials
-        """)
-    
-    st.markdown("---")
-    st.markdown("### 🛠️ Technology Stack")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown("""
-        **Financial & Billing**
-        - Invoice Ninja
-        - Wave Apps
-        - Canvas Credit Union
-        """)
-    
-    with col2:
-        st.markdown("""
-        **Business Operations**
-        - Microsoft Office
-        - SignRequest
-        - Vikunja
-        - BookStack
-        """)
-    
-    with col3:
-        st.markdown("""
-        **Automation & Dev**
-        - n8n
-        - Shlink
-        - LinkStack
-        """)
-    
-    with col4:
-        st.markdown("""
-        **Social & Marketing**
-        - YouTube
-        - LinkedIn
-        - Instagram
-        - Facebook
-        """)
-    
-    st.markdown("---")
-    st.markdown("### 💼 How We Work")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.success("**✓ FREE 30-minute consultation**\n\nLet's discuss your needs and explore solutions")
-    
-    with col2:
-        st.success("**✓ Project-based pricing**\n\nComplete project quotes including implementation and support")
-    
-    with col3:
-        st.success("**✓ Hourly consulting**\n\n$30/hour for ongoing advisory or one-off questions")
-    
-    st.markdown("---")
-    st.markdown("### 📞 Let's Work Together")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        **Contact:**
-        - 📧 info@luwahtechnologies.com
-        - 📱 +1 (720) 421-7184
-        - 📍 Aurora, Colorado
-        """)
-    with col2:
-        st.markdown("""
-        **Book a consultation:**
-        
-        [📅 Schedule Free 30-min Call](mailto:info@luwahtechnologies.com?subject=Consultation%20Request)
-        """)
 
 
 # --- GITHUB SECTION ---
