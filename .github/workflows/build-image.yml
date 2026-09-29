@@ -39,6 +39,11 @@ env:
   SMOKE_PORT: "8501"        # the container's listen port
   SMOKE_PATH: "/_stcore/health"   # a path the app serves itself
   SMOKE_EXPECT: "ok"        # a string the response body must contain
+  # Optional. A Python script piped into `python -` INSIDE the built image, under
+  # the same restrictions. The health check above only proves the server answers,
+  # not that the app works: Streamlit's health path stays "ok" when a page raises.
+  # For Streamlit apps use smoke_pages.streamlit.py, which renders every page.
+  SMOKE_PYTHON_SCRIPT: "scripts/smoke_pages.py"
 
 jobs:
   build:
@@ -90,6 +95,14 @@ jobs:
           fi
           echo "smoke test passed after $((i*2))s"
           docker rm -f smoke >/dev/null
+
+      - name: Run the script inside the image (optional)
+        if: ${{ env.SMOKE_PYTHON_SCRIPT != '' }}
+        run: |
+          set -euo pipefail
+          docker run -i --rm --read-only --tmpfs /tmp:rw,size=64m \
+            --cap-drop ALL --security-opt no-new-privileges --user 10001:10001 \
+            --entrypoint python "${IMAGE}:${TAG}" - < "${SMOKE_PYTHON_SCRIPT}"
 
       - name: Push (release tags only)
         if: startsWith(github.ref, 'refs/tags/v')
