@@ -1,0 +1,105 @@
+name: build-image
+
+# Builds the app's container image for the luwah-k3s cluster, smoke-tests it
+# under the same restrictions the pod runs with, and pushes it to GHCR when a
+# release tag is pushed. Copy to .github/workflows/build-image.yml in the app
+# repo and set the three SMOKE_* values.
+#
+#   pull request       build + smoke test, never pushes
+#   tag vX.Y.Z pushed  build + smoke test + push :vX.Y.Z and :sha-<12>
+#   manual dispatch    build + smoke test, never pushes
+#
+# Deploying is a separate step on purpose: a PR to luwah-k3s that changes the
+# image tag in namespaces/<app>/manifest.yaml. Pushing an image changes nothing
+# on the cluster, and there is no `latest` tag to float.
+#
+# Nodes are amd64, so the image is linux/amd64 only. GitHub's ubuntu-latest
+# runner is amd64, so this is a native build with no QEMU.
+#
+# No third-party actions: docker and buildx are preinstalled on the runner, so
+# there is no action version to track, and the only credential is the
+# workflow's own GITHUB_TOKEN.
+#
+# After the FIRST tag push, check the package's visibility at
+# github.com/users/<owner>/packages. A package inherits its repo's visibility
+# when it is linked by the source label below, but confirm it: the cluster's
+# nodes pull it anonymously unless the manifest carries an imagePullSecret.
+
+on:
+  pull_request:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  SMOKE_PORT: "8501"        # the container's listen port
+  SMOKE_PATH: "/_stcore/health"   # a path the app serves itself
+  SMOKE_EXPECT: "ok"        # a string the response body must contain
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Work out the image name and tag
+        run: |
+          set -euo pipefail
+          # GHCR names are lowercase. The repo name is the package name.
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "TAG=ci-${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build (linux/amd64)
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/amd64 --load \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TAG}" \
+            -t "${IMAGE}:${TAG}" .
+
+      # Runs the image the way the pod will: non-root, read-only root
+      # filesystem with a tmpfs /tmp, no capabilities, no privilege escalation.
+      # A container that only works as root, or that writes to its own
+      # filesystem, fails here instead of on the cluster.
+      - name: Smoke test under the pod's restrictions
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke -p "${SMOKE_PORT}:${SMOKE_PORT}" \
+            --read-only --tmpfs /tmp:rw,size=64m \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --user 10001:10001 "${IMAGE}:${TAG}"
+          ok=""
+          for i in $(seq 1 45); do
+            if body="$(curl -fsS --max-time 3 "http://127.0.0.1:${SMOKE_PORT}${SMOKE_PATH}" 2>/dev/null)" \
+               && grep -qF -- "${SMOKE_EXPECT}" <<<"$body"; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::smoke test failed: no ${SMOKE_EXPECT} from ${SMOKE_PATH} in 90s"
+            docker logs smoke || true
+            exit 1
+          fi
+          echo "smoke test passed after $((i*2))s"
+          docker rm -f smoke >/dev/null
+
+      - name: Push (release tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker tag "${IMAGE}:${TAG}" "${IMAGE}:sha-${GITHUB_SHA::12}"
+          docker push "${IMAGE}:${TAG}"
+          docker push "${IMAGE}:sha-${GITHUB_SHA::12}"
+          echo "Pushed ${IMAGE}:${TAG}. Deploy by changing the tag in luwah-k3s namespaces/<app>/manifest.yaml."

@@ -1,0 +1,9 @@
+# Keep history, CI config and the abandoned Gatsby wrapper (luwah-resume/, an
+# unbuildable sibling project that only iframes a dead URL) out of the image.
+.git
+.github
+luwah-resume
+**/__pycache__
+Dockerfile
+.dockerignore
+Readme.md

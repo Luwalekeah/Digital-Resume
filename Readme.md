@@ -88,6 +88,17 @@ Edit `.streamlit/config.toml` to change colors:
 2. Set build command: `pip install -r requirements.txt`
 3. Set start command: `streamlit run Home.py --server.port $PORT`
 
+### Container image (luwah-k3s)
+
+The app also builds as a container image for the homelab cluster.
+
+- `Dockerfile` runs `streamlit run Home.py` as a non-root user on port 8501.
+- `.github/workflows/build-image.yml` builds it on every pull request and smoke
+  tests it under the same restrictions the pod runs with (read-only root
+  filesystem, no capabilities). Pushing a tag like `v0.1.0` also pushes
+  `ghcr.io/luwalekeah/digital-resume:v0.1.0`.
+- Deploying is a change to the image tag in the `luwah-k3s` repo, not a push here.
+
 ### Streamlit Cloud
 1. Push to GitHub
 2. Connect at share.streamlit.io
