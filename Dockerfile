@@ -5,10 +5,10 @@
 #
 # Runs as uid 10001 with a read-only root filesystem: nothing is written under
 # /app, HOME points at /tmp (an emptyDir in the pod), and bytecode is not
-# written. Streamlit reads its config only from ./.streamlit/config.toml in the
-# working directory. This repo keeps its theme at static/.streamlit/config.toml,
-# which is never read, so the app runs on Streamlit's default theme (checked in a
-# browser). The README's Render start command runs it from the repo root the same
+# written. Streamlit reads project config from ./.streamlit/config.toml in the
+# working directory (and a per-user file under HOME, which is empty here). This
+# repo keeps its theme at static/.streamlit/config.toml, which is never read, so
+# the app runs on Streamlit's default theme (checked in a browser). The README's Render start command runs it from the repo root the same
 # way, so the migration keeps the look unchanged (the live service's real start
 # command is unconfirmed). Moving the file to .streamlit/ is a visual change and a
 # separate decision.

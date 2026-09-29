@@ -7,7 +7,8 @@ name: build-image
 #
 #   pull request       build + smoke test, never pushes
 #   tag vX.Y.Z pushed  build + smoke test + push :vX.Y.Z and :sha-<12>
-#   manual dispatch    build + smoke test, never pushes
+#   manual dispatch    build + smoke test, never pushes (the push step requires
+#                      a push EVENT, so dispatching against a tag ref does not push)
 #
 # Deploying is a separate step on purpose: a PR to luwah-k3s that changes the
 # image tag in namespaces/<app>/manifest.yaml. Pushing an image changes nothing
@@ -21,9 +22,23 @@ name: build-image
 # workflow's own GITHUB_TOKEN.
 #
 # After the FIRST tag push, check the package's visibility at
-# github.com/users/<owner>/packages. A package inherits its repo's visibility
-# when it is linked by the source label below, but confirm it: the cluster's
-# nodes pull it anonymously unless the manifest carries an imagePullSecret.
+# github.com/users/<owner>/packages. New GHCR packages may be created PRIVATE
+# whatever the repo's visibility, so treat "public" as a step you do, not an
+# assumption: the cluster's nodes pull anonymously unless the manifest carries
+# an imagePullSecret. (The source label below links the package to the repo.)
+#
+# What protects a release, and what does not:
+#   - a tag is only pushed if its commit is on the default branch, so a tag on a
+#     stray commit does not publish
+#   - an existing tag is never overwritten. A re-run of a tag build would
+#     otherwise replace :vX.Y.Z with a rebuild from unpinned inputs (base image,
+#     requirements), the same tag with different bytes
+#   - the workflow prints the pushed digest. Pin it in the cluster manifest as
+#     image: <name>:vX.Y.Z@sha256:<digest> so nodes cannot drift from what was tested
+#   - NOT protected: `packages: write` is granted to every run of this file, so
+#     anyone who can edit the workflow on a branch of this repo can push an image
+#     with a new tag. That is the same power as pushing a tag, and this repo has
+#     one writer. Split the push into a tag-only workflow if that ever changes.
 
 on:
   pull_request:
@@ -50,6 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # the push step checks the tag commit is on the default branch
 
       - name: Work out the image name and tag
         run: |
@@ -105,14 +122,33 @@ jobs:
             --entrypoint python "${IMAGE}:${TAG}" - < "${SMOKE_PYTHON_SCRIPT}"
 
       - name: Push (release tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/${DEFAULT_BRANCH}"; then
+            echo "::error::${TAG} points at ${GITHUB_SHA::12}, which is not on ${DEFAULT_BRANCH}. Refusing to publish."
+            exit 1
+          fi
           echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          if docker manifest inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
+            echo "::error::${IMAGE}:${TAG} already exists. Refusing to overwrite a published tag: cut a new version."
+            exit 1
+          fi
           docker tag "${IMAGE}:${TAG}" "${IMAGE}:sha-${GITHUB_SHA::12}"
           docker push "${IMAGE}:${TAG}"
           docker push "${IMAGE}:sha-${GITHUB_SHA::12}"
-          echo "Pushed ${IMAGE}:${TAG}. Deploy by changing the tag in luwah-k3s namespaces/<app>/manifest.yaml."
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE}:${TAG}")"
+          {
+            echo "### Published ${IMAGE}:${TAG}"
+            echo
+            echo "Pin this in luwah-k3s namespaces/<app>/manifest.yaml:"
+            echo
+            echo '```'
+            echo "image: ${digest%@*}:${TAG}@${digest#*@}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed ${digest}."
