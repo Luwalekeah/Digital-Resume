@@ -1,0 +1,16 @@
+# Keep history, CI config, the abandoned Gatsby wrapper (luwah-resume/, an
+# unbuildable sibling project that only iframes a dead URL) and CI helper
+# scripts out of the image. Also keep secrets out of a local build context.
+.git
+.github
+luwah-resume
+scripts
+.env
+.env.*
+*.pem
+*.key
+**/secrets.toml
+**/__pycache__
+Dockerfile
+.dockerignore
+Readme.md

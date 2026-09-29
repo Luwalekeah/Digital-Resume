@@ -1,0 +1,205 @@
+name: build-image
+
+# Builds the app's container image for the luwah-k3s cluster, smoke-tests it
+# under the same restrictions the pod runs with, and pushes it to GHCR when a
+# release tag is pushed. Copy to .github/workflows/build-image.yml in the app
+# repo and set the three SMOKE_* values.
+#
+#   pull request       build + smoke test, never pushes
+#   tag vX.Y.Z pushed  build + smoke test + release guards + push :vX.Y.Z
+#   manual dispatch    build + smoke test, never pushes (the push step requires
+#                      a push EVENT, so dispatching against a tag ref does not push)
+#
+# Deploying is a separate step on purpose: a PR to luwah-k3s that changes the
+# image tag in namespaces/<app>/manifest.yaml. Pushing an image changes nothing
+# on the cluster, and there is no `latest` tag to float.
+#
+# Nodes are amd64, so the image is linux/amd64 only. GitHub's ubuntu-latest
+# runner is amd64, so this is a native build with no QEMU.
+#
+# No third-party actions: docker and buildx are preinstalled on the runner, so
+# there is no action version to track, and the only credential is the
+# workflow's own GITHUB_TOKEN.
+#
+# After the FIRST tag push, check the package's visibility at
+# github.com/users/<owner>/packages. New GHCR packages may be created PRIVATE
+# whatever the repo's visibility, so treat "public" as a step you do, not an
+# assumption: the cluster's nodes pull anonymously unless the manifest carries
+# an imagePullSecret. (The source label below links the package to the repo.)
+#
+# What protects a release, and what does not:
+#   - a tag is only pushed if its commit is on the default branch, so a tag on a
+#     stray commit does not publish
+#   - an existing tag is never overwritten. A re-run of a tag build would
+#     otherwise replace :vX.Y.Z with a rebuild from unpinned inputs (base image,
+#     requirements), the same tag with different bytes. The guard asks the GitHub
+#     packages API and stops on any answer it does not recognise, so it fails
+#     closed. Only :vX.Y.Z is pushed (there is no second tag to guard)
+#   - THESE GUARDS HAVE NEVER RUN. They are on the push path, which is skipped on
+#     pull requests, so the first real tag push is their first test. A failure
+#     there publishes nothing, so it is safe, and the log names what to check
+#   - the workflow prints the pushed digest. Pin it in the cluster manifest as
+#     image: <name>:vX.Y.Z@sha256:<digest> so nodes cannot drift from what was tested
+#   - NOT protected: `packages: write` is granted to every run of this file, so
+#     anyone who can edit the workflow on a branch of this repo can push an image
+#     with a new tag. That is the same power as pushing a tag, and this repo has
+#     one writer. Split the push into a tag-only workflow if that ever changes.
+
+on:
+  pull_request:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  SMOKE_PORT: "8501"        # the container's listen port
+  SMOKE_PATH: "/_stcore/health"   # a path the app serves itself
+  SMOKE_EXPECT: "ok"        # a string the response body must contain
+  # Optional. A Python script piped into `python -` INSIDE the built image, under
+  # the same restrictions. The health check above only proves the server answers,
+  # not that the app works: Streamlit's health path stays "ok" when a page raises.
+  # For Streamlit apps use smoke_pages.streamlit.py, which renders every page.
+  SMOKE_PYTHON_SCRIPT: "scripts/smoke_pages.py"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # the push step checks the tag commit is on the default branch
+
+      - name: Work out the image name and tag
+        run: |
+          set -euo pipefail
+          # GHCR names are lowercase. The repo name is the package name.
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "TAG=ci-${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build (linux/amd64)
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/amd64 --load \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TAG}" \
+            -t "${IMAGE}:${TAG}" .
+
+      # Runs the image the way the pod will: non-root, read-only root
+      # filesystem with a tmpfs /tmp, no capabilities, no privilege escalation.
+      # A container that only works as root, or that writes to its own
+      # filesystem, fails here instead of on the cluster.
+      - name: Smoke test under the pod's restrictions
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke -p "${SMOKE_PORT}:${SMOKE_PORT}" \
+            --read-only --tmpfs /tmp:rw,size=64m \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --user 10001:10001 "${IMAGE}:${TAG}"
+          ok=""
+          for i in $(seq 1 45); do
+            if body="$(curl -fsS --max-time 3 "http://127.0.0.1:${SMOKE_PORT}${SMOKE_PATH}" 2>/dev/null)" \
+               && grep -qF -- "${SMOKE_EXPECT}" <<<"$body"; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::smoke test failed: no ${SMOKE_EXPECT} from ${SMOKE_PATH} in 90s"
+            docker logs smoke || true
+            exit 1
+          fi
+          echo "smoke test passed after $((i*2))s"
+          docker rm -f smoke >/dev/null
+
+      - name: Run the script inside the image (optional)
+        if: ${{ env.SMOKE_PYTHON_SCRIPT != '' }}
+        run: |
+          set -euo pipefail
+          docker run -i --rm --read-only --tmpfs /tmp:rw,size=64m \
+            --cap-drop ALL --security-opt no-new-privileges --user 10001:10001 \
+            --entrypoint python "${IMAGE}:${TAG}" - < "${SMOKE_PYTHON_SCRIPT}"
+
+      - name: Release guard 1 - the tag commit must be on the default branch
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/${DEFAULT_BRANCH}"; then
+            echo "::error::${TAG} points at ${GITHUB_SHA::12}, which is not on ${DEFAULT_BRANCH}. Refusing to publish."
+            exit 1
+          fi
+
+      # Asks the GitHub packages API, not the registry: `docker manifest inspect`
+      # cannot tell a missing tag from a private package or a registry blip, and
+      # a guard that treats every failure as "absent" fails open. Here 404 means
+      # the package does not exist yet (the first release), 200 is searched for
+      # the tag, and ANYTHING else stops the release with the status code. Nothing
+      # is published on a stop, so the failure is safe, and the message says what
+      # to check. This guard has not yet run against GitHub: the push steps are
+      # skipped on pull requests. Expect to debug it on the first tag.
+      - name: Release guard 2 - never overwrite a published tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          OWNER_TYPE: ${{ github.event.repository.owner.type }}
+        run: |
+          set -euo pipefail
+          name="${GITHUB_REPOSITORY#*/}"; name="${name,,}"
+          case "$OWNER_TYPE" in Organization) scope=orgs ;; *) scope=users ;; esac
+          api="${GITHUB_API_URL:-https://api.github.com}"
+          page=1
+          while :; do
+            code="$(curl -sS -o "$RUNNER_TEMP/versions.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${api}/${scope}/${OWNER}/packages/container/${name}/versions?per_page=100&page=${page}")" || code="000"
+            case "$code" in
+              404) echo "no package ${name} yet: this is its first release"; break ;;
+              200) ;;
+              *)
+                echo "::error::cannot tell whether ${IMAGE}:${TAG} already exists: the packages API answered ${code}. Nothing was published."
+                head -c 300 "$RUNNER_TEMP/versions.json" || true; echo
+                exit 1 ;;
+            esac
+            if jq -e --arg t "$TAG" 'any(.[]; (.metadata.container.tags // []) | index($t))' "$RUNNER_TEMP/versions.json" >/dev/null; then
+              echo "::error::${IMAGE}:${TAG} already exists. Refusing to overwrite a published tag: cut a new version."
+              exit 1
+            fi
+            [ "$(jq length "$RUNNER_TEMP/versions.json")" -lt 100 ] && break
+            page=$((page + 1))
+          done
+          echo "${IMAGE}:${TAG} is not published yet"
+
+      - name: Push (release tags only)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker push "${IMAGE}:${TAG}" | tee "$RUNNER_TEMP/push.log"
+          digest="$(grep -oE 'sha256:[0-9a-f]{64}' "$RUNNER_TEMP/push.log" | tail -1 || true)"
+          if [ -z "$digest" ]; then
+            echo "::warning::pushed ${IMAGE}:${TAG} but could not read its digest from the push output. Get it with: docker buildx imagetools inspect ${IMAGE}:${TAG}"
+            exit 0
+          fi
+          {
+            echo "### Published ${IMAGE}:${TAG}"
+            echo
+            echo "Pin this in luwah-k3s namespaces/<app>/manifest.yaml:"
+            echo
+            echo '```'
+            echo "image: ${IMAGE}:${TAG}@${digest}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed ${IMAGE}:${TAG}@${digest}"
