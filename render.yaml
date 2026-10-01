@@ -1,0 +1,16 @@
+# Render Blueprint for the Streamlit resume site.
+# `name` (and `region`, if not Oregon) must match the existing service in the
+# Render dashboard for the Blueprint to manage it instead of creating a new one.
+services:
+  - type: web
+    name: daniel-cooke-cv
+    runtime: python
+    region: ohio
+    plan: 0.5c-512mb
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run Home.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    healthCheckPath: /_stcore/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.12
